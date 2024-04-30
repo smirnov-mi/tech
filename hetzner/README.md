@@ -11,4 +11,6 @@ https://community.hetzner.com/tutorials/howto-hcloud-terraform
 
 https://github.com/hetznercloud/terraform-provider-hcloud
 
+See for details: https://github.com/smirnov-mi/tech/tree/main/hetzner/terraform
+
 
