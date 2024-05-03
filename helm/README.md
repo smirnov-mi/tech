@@ -23,3 +23,5 @@ https://github.com/helm/helm/releases
     drwxr-xr-x 3 ms root 4096 May  3 23:13 templates
     -rw-r--r-- 1 ms root 2363 May  3 23:13 values.yaml
 
+see: https://helm.sh/docs/chart_template_guide/getting_started/
+
