@@ -20,7 +20,3 @@ provider "hcloud" {
   token = var.hcloud_token
 }
 
-# Create a server
-resource "hcloud_server" "web" {
-  # ...
-}
