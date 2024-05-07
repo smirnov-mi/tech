@@ -29,7 +29,7 @@ resource "hcloud_server" "server-8" {
   image       = "debian-11"
   server_type = "cx11"
   location    = "nbg1"
-  ssh_keys    = [access1]
+  ssh_keys    = ["access1"]
   network {
     network_id = hcloud_network.mynet.id
     ip         = "10.0.1.8"
