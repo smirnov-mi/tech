@@ -10,21 +10,21 @@ variable "bastion" {
 
 
 variable "private_ip_range" {
-  type=string
+  type = string
   default = "10.0.0.0/16"
 }
 
 variable "network_name" {
-  type=string
+  type = string
   default = "default"
 }
 
 variable "private_network_zone" {
-  type=string
+  type = string
   default = "eu-central"
 }
 
 variable "hcloud_location" {
-  type=string
+  type = string
   default = "nbg1"
 }
