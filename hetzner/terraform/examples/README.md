@@ -12,6 +12,12 @@ Create a new project in Hetzner CLoud (or use existing), create a new RW Token, 
 ##  tf apply
 
 ```bash
+export HCLOUD_TOKEN=YOURTKN0GU4GkKnP2NT3GKLrDpZ6LAa4QzAcFdSZkcGRVhLm1xr7WHLQpavri8su
+```
+
+or 
+
+```bash
 tf apply -var="hcloud_token=YOURTKN0GU4GkKnP2NT3GKLrDpZ6LAa4QzAcFdSZkcGRVhLm1xr7WHLQpavri8su"
 tf destroy -var="hcloud_token=YOURTKN0GU4GkKnP2NT3GKLrDpZ6LAa4QzAcFdSZkcGRVhLm1xr7WHLQpavri8su"
 ```
