@@ -18,12 +18,18 @@ resource "hcloud_network_subnet" "subnet-1" {
 #  ip         = "10.0.1.4"
 #}
 
+resource "hcloud_ssh_key" "default" {
+  name       = "access1"
+  public_key = file("~/.ssh/id_rsa.pub")
+}
+
 
 resource "hcloud_server" "server-8" {
   name        = "server-8"
   image       = "debian-11"
   server_type = "cx11"
   location    = "nbg1"
+  ssh_keys    = [access1]
   network {
     network_id = hcloud_network.mynet.id
     ip         = "10.0.1.8"
