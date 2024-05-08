@@ -26,9 +26,14 @@ https://github.com/hetznercloud/terraform-provider-hcloud
 Otehrwise you can use the precompiled version from the releases page:
 https://registry.terraform.io/providers/hetznercloud/hcloud/latest
 
+
 ```bash
 hetznercloud/terraform-provider-hcloud
 ```
 
+# Cluster with private network and LB
+
+see:
+https://github.com/smirnov-mi/hcloud-tf-one
 
 
