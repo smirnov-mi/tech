@@ -9,6 +9,12 @@ https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs
 Create a new project in Hetzner CLoud (or use existing), create a new RW Token, it should then be exported as a HCLOUD_TOKEN variable.
 
 
+## rename tf files
+
+only keep one **.tf** file in the folder, as these all are example _standalone_ files for different resources.
+
+
+
 ##  tf apply
 
 ```bash
