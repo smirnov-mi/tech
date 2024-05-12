@@ -1,0 +1,2007 @@
+ROOK-ceph - CePH on k8s cluster
+
+CEPH provides storage as:
+RBD rwo (done 2019 11 23, 2020.02.10)
+CephFS rwx (tested in july 2019)
+NFS (not testet yet)
+
+https://git.maxcrc.de/k8s/how-to/blob/master/k8s_Ceph_setup.md
+
+
+
+2019 07 17
+https://softwareengineeringdaily.com/2019/01/11/why-is-storage-on-kubernetes-is-so-hard/
+https://rook.github.io/docs/rook/master/ceph-quickstart.html
+https://akomljen.com/rook-cloud-native-on-premises-persistent-storage-for-kubernetes-on-kubernetes/
+
+https://github.com/rook/rook/blob/master/Documentation/ceph-quickstart.md
+
+https://earlruby.org/2018/12/using-rook-ceph-for-persistent-storage-on-kubernetes/
+https://www.cloudtechnologyexperts.com/kubernetes-persistent-volume-with-rook/
+
+
+
+root@max1-master-01:~/tmp1# kubectl get -o wide nodes
+NAME             STATUS   ROLES    AGE   VERSION   INTERNAL-IP      EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME
+max1-master-01   Ready    master   14d   v1.14.3   116.203.84.124   <none>        Ubuntu 18.04.2 LTS   4.15.0-54-generic   docker://18.9.7
+max1-master-02   Ready    master   14d   v1.14.3   95.216.165.249   <none>        Ubuntu 18.04.2 LTS   4.15.0-54-generic   docker://18.9.7
+max1-master-03   Ready    master   14d   v1.14.3   116.202.107.24   <none>        Ubuntu 18.04.2 LTS   4.15.0-54-generic   docker://18.9.7
+max1-worker-01   Ready    <none>   14d   v1.14.3   116.203.83.248   <none>        Ubuntu 18.04.2 LTS   4.15.0-54-generic   docker://18.9.7
+max1-worker-02   Ready    <none>   14d   v1.14.3   95.216.162.63    <none>        Ubuntu 18.04.2 LTS   4.15.0-54-generic   docker://18.9.7
+max1-worker-03   Ready    <none>   14d   v1.14.3   116.202.106.64   <none>        Ubuntu 18.04.2 LTS   4.15.0-54-generic   docker://18.9.7
+
+
+24.10.2019:
+root@max2-master-01:~# kubectl get -o wide nodes
+NAME             STATUS   ROLES    AGE   VERSION   INTERNAL-IP       EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME
+max2-master-01   Ready    master   34d   v1.16.2   116.203.248.252   <none>        Ubuntu 18.04.3 LTS   4.15.0-66-generic   docker://19.3.4
+max2-master-02   Ready    master   34d   v1.16.2   116.203.199.1     <none>        Ubuntu 18.04.3 LTS   4.15.0-66-generic   docker://19.3.4
+max2-master-03   Ready    master   34d   v1.16.2   116.203.248.253   <none>        Ubuntu 18.04.3 LTS   4.15.0-66-generic   docker://19.3.4
+max2-worker-01   Ready    <none>   34d   v1.16.2   116.203.248.254   <none>        Ubuntu 18.04.3 LTS   4.15.0-66-generic   docker://19.3.4
+max2-worker-02   Ready    <none>   34d   v1.16.2   116.203.206.179   <none>        Ubuntu 18.04.3 LTS   4.15.0-66-generic   docker://19.3.4
+max2-worker-03   Ready    <none>   34d   v1.16.2   116.203.248.255   <none>        Ubuntu 18.04.3 LTS   4.15.0-66-generic   docker://19.3.4
+
+
+
+==== OPTIONAL: Label Nodes ==== 
+if we want to restrict some Ceph nodes/FSs, we need to label k8s nodes, e.g.:
+root@max2-master-01:~# kubectl label node max2-master-01 land=fi
+root@max2-master-01:~# kubectl label node max2-master-03 land=fi
+root@max2-master-01:~# kubectl label node max2-master-02 land=de
+root@max2-master-01:~# kubectl label node max2-worker-02 land=de
+root@max2-master-01:~# kubectl label node max2-worker-03 land=fi
+root@max2-master-01:~# kubectl label node max2-worker-04 land=de
+root@max2-master-01:~# kubectl label node max2-worker-05 land=de
+node/max2-worker-05 labeled
+
+check:
+kugetw nodes --show-labels
+
+To remove wrong label:
+root@max2-master-01:~# kubectl label node max2-worker-05 land-
+
+
+==== END: Label Nodes ====
+
+
+
+
+Install ceph-common package on all cluster nodes:
+apt-get install ceph-common -y
+
+FYI:
+The following NEW packages will be installed:
+  ceph-common libbabeltrace1 libcephfs2 libdw1 libgoogle-perftools4
+  libibverbs1 libnl-route-3-200 libnspr4 libnss3 libpython-stdlib libpython2.7
+  libpython2.7-minimal libpython2.7-stdlib librados2 libradosstriper1 librbd1
+  libsnappy1v5 libtcmalloc-minimal4 python python-cephfs python-certifi
+  python-chardet python-idna python-minimal python-pkg-resources
+  python-prettytable python-rados python-rbd python-requests python-six
+  python-urllib3 python2.7 python2.7-minimal
+  
+  
+msmirnov@apps:~$ for i in $M2A ; do ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root $i apt-get install ceph-common -y ; done
+
+
+
+
+
+root@max1-master-01:~# cd  && rm -rf tmp1/ ; mkdir tmp1 && cd tmp1/
+root@max1-master-01:~/tmp1# git clone https://github.com/rook/rook.git
+
+cd /root/tmp1/rook/cluster/examples/kubernetes/ceph
+
+kubectl create -f common.yaml
+kubectl create -f operator.yaml
+
+Check:
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kuget po |grep ceph
+rook-ceph      rook-ceph-operator-854bc494c5-sdmr8                      1/1     Running   0          9m59s
+rook-ceph      rook-discover-7r7kw                                      1/1     Running   0          9m56s
+rook-ceph      rook-discover-dvz7n                                      1/1     Running   0          9m56s
+rook-ceph      rook-discover-lvjf2                                      1/1     Running   0          9m56s
+rook-ceph      rook-discover-nbdfw                                      1/1     Running   0          9m56s
+
+
+!!!! Last step - important !!!!
+Before creating this, doublecheck the settings of the nodes / disk names, 
+and ensure that the disks are created and empty. NO filesystems, NO data, NO shit, otherwise Ceph won't take the disk.
+
+
+
+
+
+
+check what disks you have:
+$ for i in $M2W ; do ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root $i fdisk -l ; done
+
+cleanup /dev/sdb disks on worker nodes, use e.g.: 
+$ for i in $M2W ; do ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root $i sgdisk --zap-all /dev/sdb ; done
+
+or:
+$ for i in $M2W ; do ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root $i dd if=/dev/zero of=/dev/sdb count=1 bs=100M ; done
+
+
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph# pwd
+/root/tmp3/rook/cluster/examples/kubernetes/ceph
+
+
+
+msmirnov@apps:~$ for i in $M2A ; do ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root $i mkdir -p /data/rook ; done  
+
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph# kubectl apply -f cluster_max2.yaml
+cephcluster.ceph.rook.io/rook-ceph created
+
+
+or:
+kubectl create -f cluster-test.yaml 
+(this might take a few minutes!)
+
+
+check with: kubectl get po -n rook-ceph -o wide
+
+
+
+
+
+
+
+
+==== RESTART OF THE OPERATOR pod might be required:
+
+kubectl -n rook-ceph delete po $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}')
+
+check it's logs then:
+kubectl -n rook-ceph logs -f $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}')
+
+
+!!! THE INITIALAZATION CAN TAKE A WHILE. 20-40 minutes, or even more (mid. 2019)
+
+==== END: restart operator pod. ====
+
+
+
+
+#IF REQUIRED: Edit ceph cluster configuration:
+
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl -n rook-ceph edit CephCluster rook-ceph
+
+
+
+
+
+THE MAIN INSTALLATION IS DONE now
+
+
+check with (this might work, or NOT - on the new versions. Use Toolbox container then, see below.)
+# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}') ceph status
+or
+# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}') ceph osd status
+
+
+===========================
+
+
+==== INSTALL THE TOOLBOX (some of the commands can be done from the operator container):
+
+The Ceph tools will commonly be the only tools needed to troubleshoot a cluster. 
+In that case, you can connect to any of the rook pods and execute the ceph commands 
+in the same way that you would in the toolbox pod such as 
+the mon (not perfect) pods or the operator (good) pod.
+
+kubectl create -f toolbox.yaml
+
+CONNECT TO IT:
+master# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh 
+
+TO REMOVE the toolbox:
+master# kubectl -n rook-ceph delete deployment rook-ceph-tools
+
+
+
+
+
+
+
+==== HOWTO remove Pool ====
+
+https://rook.io/docs/rook/master/ceph-teardown.html
+
+https://github.com/rook/rook/blob/master/Documentation/ceph-advanced-configuration.md
+
+https://github.com/rook/rook/blob/master/Documentation/ceph-advanced-configuration.md#deleting-a-pool
+
+#delete all PVCs, PVs;
+
+
+#info cluster
+master# kubectl describe cephcluster -n rook-ceph
+
+
+# delete storageclass:
+master-01# kuget storageclass
+NAME            PROVISIONER          AGE
+rook-ceph-blk   ceph.rook.io/block   27h
+
+master-01# kubectl delete storageclass rook-ceph-blk
+storageclass.storage.k8s.io "rook-ceph-blk" deleted
+
+# inform monitors:
+
+master# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh
+
+toolbox-sh-4.2# ceph tell mon.\* injectargs '--mon-allow-pool-delete=true'
+mon.a: injectargs:mon_allow_pool_delete = 'true'
+mon.b: injectargs:mon_allow_pool_delete = 'true'
+mon.c: injectargs:mon_allow_pool_delete = 'true'
+
+
+# remove pool:
+
+sh-4.2# rados df
+POOL_NAME     USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS     RD WR_OPS     WR USED COMPR UNDER COMPR
+3repl-pool 2.1 MiB      41      0    123                  0       0        0     49 35 KiB     21 21 KiB        0 B         0 B
+
+total_objects    22
+total_used       3.1 GiB
+total_avail      24 GiB
+total_space      27 GiB
+
+sh-4.2# ceph osd pool rm 3repl-pool 3repl-pool --yes-i-really-really-mean-it
+pool '3repl-pool' removed
+
+# check:
+sh-4.2# rados df
+POOL_NAME USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS RD WR_OPS WR USED COMPR UNDER COMPR
+
+total_objects    0
+total_used       3.1 GiB
+total_avail      24 GiB
+total_space      27 GiB
+
+
+
+
+root@max2-master-01:~/tmp-openldap/stable# kuget CephBlockPool
+NAMESPACE   NAME          AGE
+rook-ceph   3repl-pool    30h
+rook-ceph   replicapool   151m
+
+root@max2-master-01:~/tmp-openldap/stable# kubectl -n rook-ceph delete CephBlockPool replicapool
+cephblockpool.ceph.rook.io "replicapool" deleted
+
+root@max2-master-01:~/tmp-openldap/stable# kubectl -n rook-ceph delete CephBlockPool 3repl-pool
+cephblockpool.ceph.rook.io "3repl-pool" deleted
+
+root@max2-master-01:~/tmp-openldap/stable# kuget CephBlockPool
+No resources found
+
+
+==== END removing Pool ====
+
+
+
+
+
+
+
+
+
+
+
+============== HOWTO delete the whole ceph cluster ============
+
+https://github.com/rook/rook/blob/master/Documentation/ceph-teardown.md
+
+============== END - Deleting Ceph Cluster ==========
+
+
+
+
+
+================== HOWTO remove CephFS ====================
+
+
+master# kubectl delete po -n rook-ceph rook-ceph-mds*
+
+master# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}') sh
+
+
+master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh
+
+sh-4.2# ceph osd pool ls
+
+sh-4.2# ceph mds fail 0
+
+sh-4.2# ceph osd pool rm 3repl-fs-metadata 3repl-fs-metadata --yes-i-really-really-mean-it
+pool '3repl-fs-metadata' removed
+sh-4.2# ceph osd pool rm 3repl-fs-data0 3repl-fs-data0 --yes-i-really-really-mean-it
+pool '3repl-fs-data0' removed
+
+
+check with 
+# ceph status
+
+master# kubectl  -n rook-ceph delete Deployment/rook-ceph-mds-myfs-a
+master# kubectl  -n rook-ceph delete Deployment/rook-ceph-mds-myfs-b
+
+
+
+FROM:
+systemctl stop ceph-mds.target
+killall ceph-mds
+
+ceph mds cluster_down
+ceph mds fail 0
+
+ceph fs rm <cephfs name> --yes-i-really-mean-it
+
+ceph osd pool delete <cephfs data pool> <cephfs data pool> --yes-i-really-really-mean-it
+ceph osd pool delete <cephfs metadata pool> <cephfs metadata pool> --yes-i-really-really-mean-it
+
+rm -rf "/var/lib/ceph/mds/<cluster-metadata server>"
+
+ceph auth del mds."$hostname"
+
+================== END removing CephFS ====================
+
+
+
+
+
+
+
+
+
+==== Setting up consumable storage ====
+
+
+https://github.com/rook/rook/blob/master/Documentation/ceph-examples.md#setting-up-consumable-storage
+
+
+========= BEGIN - for 1-Pod-setups - ReadWriteOnce =======
+
+OK, we now have an empty ceph cluster running:
+
+root@max2-master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh
+sh-4.2# ceph osd pool ls
+sh-4.2#
+
+
+
+
+OLD !!! ->  https://akomljen.com/rook-cloud-native-on-premises-persistent-storage-for-kubernetes-on-kubernetes/ (OLD !!!!)
+
+Before we can consume this cluster, we need to create at least one POOL with the desired number of replicas. 
+The number of replicas is usually set to three. And create a STORAGE-CLASS then.
+
+
+
+
+
+
+
+
+
+ ----> TODO:
+
+
+  IMPORTANT !!!!   READ THE CURRENT ROOK Documentation
+https://github.com/rook/rook/blob/master/Documentation/ceph-examples.md
+
+
+2019.11.23: currect EXAMPLE we need is here, ceph version 14.2.4 : 
+
+!!! set RetainPolicy to Retain !!
+
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph/csi/rbd# cat storageclass.yaml
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: replicapool
+  namespace: rook-ceph
+spec:
+  failureDomain: host
+  replicated:
+    size: 3
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: rook-ceph-block
+provisioner: rook-ceph.rbd.csi.ceph.com
+parameters:
+    # clusterID is the namespace where the rook cluster is running
+    # If you change this namespace, also change the namespace below where the secret namespaces are defined
+    clusterID: rook-ceph
+
+    # Ceph pool into which the RBD image shall be created
+    pool: replicapool
+
+    # RBD image format. Defaults to "2".
+    imageFormat: "2"
+
+    # RBD image features. Available for imageFormat: "2". CSI RBD currently supports only `layering` feature.
+    imageFeatures: layering
+
+    # The secrets contain Ceph admin credentials. These are generated automatically by the operator
+    # in the same namespace as the cluster.
+    csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+    csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+    csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+    csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+    # Specify the filesystem type of the volume. If not specified, csi-provisioner
+    # will set default as `ext4`.
+    csi.storage.k8s.io/fstype: ext4
+# uncomment the following to use rbd-nbd as mounter on supported nodes
+#mounter: rbd-nbd
+#reclaimPolicy: Delete
+reclaimPolicy: Retain
+
+
+
+#OK, lets go:
+
+
+master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph/csi/rbd# kubectl create -f storageclass.yaml
+cephblockpool.ceph.rook.io/replicapool created
+storageclass.storage.k8s.io/rook-ceph-block created
+
+
+# check: 
+
+master# kubectl get storageclass
+NAME              PROVISIONER                  RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+rook-ceph-block   rook-ceph.rbd.csi.ceph.com   Delete          Immediate           true                   2m35s
+
+master# kuget CephBlockPool
+NAMESPACE   NAME          AGE
+rook-ceph   replicapool   13m
+
+
+
+
+
+
+root@max1-master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') -- sh
+
+sh-4.4# ceph osd pool ls
+device_health_metrics
+
+sh-4.4# ceph osd pool ls
+device_health_metrics
+replicapool
+
+sh-4.4# rados df
+POOL_NAME                USED  OBJECTS  CLONES  COPIES  MISSING_ON_PRIMARY  UNFOUND  DEGRADED  RD_OPS     RD  WR_OPS      WR  USED COMPR  UNDER COMPR
+device_health_metrics  17 KiB        4       0      12                   0        0         0       8  8 KiB      12  12 KiB         0 B          0 B
+replicapool               0 B        0       0       0                   0        0         0       0    0 B       0     0 B         0 B          0 B
+
+total_objects    4
+total_used       4.1 GiB
+total_avail      116 GiB
+total_space      120 GiB
+
+
+
+________
+#Restart the ceph-operator container if needed (nothing or anything strange happens):
+master-01:~# kubectl -n rook-ceph delete po $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}')
+________
+
+
+#OK, looks good.  Now we can try to create a pod that will use PVs from this pool.
+
+
+# LITTLE TEST - create a simple PVC to test if Ceph cluster is working fine:
+
+cat <<EOF | kubectl create -f -
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: data1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: rook-ceph-block
+EOF
+
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph/csi/rbd# kuget pvc
+NAMESPACE   NAME        STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+default     ldap-data   Pending                                      rook-ceph-block   2s
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph/csi/rbd# kuget pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                           STORAGECLASS      REASON   AGE
+pvc-65e8a213-851e-4eaa-8e6c-017648c885f0   1Gi        RWO            Delete           Bound       default/ldap-data               rook-ceph-block            2s
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph/csi/rbd# kuget pvc
+NAMESPACE   NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+default     ldap-data   Bound    pvc-65e8a213-851e-4eaa-8e6c-017648c885f0   1Gi        RWO            rook-ceph-block   9s
+
+
+
+#### THIS DOES LOOK GOOD!
+
+
+# Don't forget to remove the PVC (PV will get removed automatically, if we have "Delete" in the StorageClass definitions):
+
+if not - master# kubectl delete pvc ldap-data
+
+
+_________
+######### OPTIONAL TEST2: #######
+
+# OR, two PVCs for LDAP - manually:
+
+root@max2-master-01# cat /root/rook-ceph-LDAP-pvc.yaml
+# two PVCs for LDAP
+# PREREQ.: rook-ceph storage class
+#  storageClassName: rook-ceph-blk
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ldap-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: rook-ceph-blk
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ldap-conf
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Mi
+  storageClassName: rook-ceph-blk
+
+
+
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph# kubectl create -f /root/rook-ceph-LDAP-pvc.yaml
+persistentvolumeclaim/ldap-data created
+persistentvolumeclaim/ldap-conf created
+
+# CHECK:
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph# kuget pvc
+NAMESPACE   NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS    AGE
+default     ldap-conf   Bound    pvc-b77388a0-1726-4e3c-b5a0-a0d238c367ae   20Mi       RWO            rook-ceph-blk   42s
+default     ldap-data   Bound    pvc-a85744db-8ba6-4599-b707-ce2039de6574   1Gi        RWO            rook-ceph-blk   43s
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes/ceph# kuget pv |grep ldap
+pvc-a85744db-8ba6-4599-b707-ce2039de6574   1Gi        RWO            Retain           Bound       default/ldap-data               rook-ceph-blk            48s
+pvc-b77388a0-1726-4e3c-b5a0-a0d238c367ae   20Mi       RWO            Retain           Bound       default/ldap-conf               rook-ceph-blk            48s
+
+######### END - OPTIONAL test with two PVCs #######
+
+
+
+
+
+
+=== CHECK CEPH Status and correct it if required ===
+
+
+master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}') sh
+
+sh-4.2# ceph -s
+
+sh-4.2# ceph health detail
+HEALTH_WARN too few PGs per OSD (8 < min 30)
+TOO_FEW_PGS too few PGs per OSD (8 < min 30)
+
+# READ:  https://ceph.com/community/new-luminous-pg-overdose-protection/
+
+
+sh-4.2# ceph osd status
++----+----------------+-------+-------+--------+---------+--------+---------+-----------+
+| id |      host      |  used | avail | wr ops | wr data | rd ops | rd data |   state   |
++----+----------------+-------+-------+--------+---------+--------+---------+-----------+
+| 0  | max2-worker-02 | 1027M | 8188M |    0   |     0   |    0   |     0   | exists,up |
+| 1  | max2-worker-01 | 1027M | 8188M |    0   |     0   |    0   |     0   | exists,up |
+| 2  | max2-worker-03 | 1027M | 8188M |    0   |     0   |    0   |     0   | exists,up |
++----+----------------+-------+-------+--------+---------+--------+---------+-----------+
+sh-4.2# rados df
+POOL_NAME     USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS    RD WR_OPS    WR USED COMPR UNDER COMPR
+3repl-pool 576 KiB       6      0     18                  0       0        0     10 6 KiB      9 9 KiB        0 B         0 B
+
+total_objects    6
+total_used       3.0 GiB
+total_avail      24 GiB
+total_space      27 GiB
+
+
+
+# Enable CEPH Autoscaler module (adds STATS):
+https://docs.ceph.com/docs/master/rados/operations/placement-groups/
+
+
+root@max1-master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh
+
+sh-4.2# ceph mgr module enable pg_autoscaler
+
+sh-4.2# ceph osd pool autoscale-status
+ POOL          SIZE  TARGET SIZE  RATE  RAW CAPACITY   RATIO  TARGET RATIO  BIAS  PG_NUM  NEW PG_NUM  AUTOSCALE
+ 3repl-pool  576.0k                3.0        27648M  0.0001                 1.0       8              off
+
+
+# To Enable Autoscaler (to let cluster set PG automatically, not sure if it's good!!):
+sh-4.2# ceph osd pool set 3repl-pool pg_autoscale_mode on
+set pool 1 pg_autoscale_mode to on
+
+# To increase PG_NUM manually: 
+sh-4.2# ceph osd pool set 3repl-pool pg_num 30
+set pool 1 pg_num to 30
+
+# check cluster status:
+sh-4.2# ceph -s
+  cluster:
+    id:     0efac88f-96dc-4a04-9e2e-daf517572fc0
+    health: HEALTH_OK
+
+  services:
+    mon: 3 daemons, quorum a,b,c (age 28m)
+    mgr: a(active, since 6m)
+    osd: 3 osds: 3 up (since 21h), 3 in (since 2w)
+
+  data:
+    pools:   1 pools, 30 pgs
+    objects: 6 objects, 49 B
+    usage:   3.0 GiB used, 24 GiB / 27 GiB avail
+    pgs:     30 active+clean
+_________
+
+!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!     OK. Basic stuff works now! Now we will try to use it.
+!!!!!!!!!!!!!!!
+_________
+
+
+OPTIONAL: Dashboard ingress - to get http access to hte dashboard.
+
+change hostname and secretName
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# kubectl create -f dashboard-ingress-https.yaml
+ingress.extensions/rook-ceph-mgr-dashboard created
+
+
+
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# echo $(kubectl get secret --namespace rook-ceph rook-ceph-dashboard-password -o jsonpath="{.data.password}" | base64 --decode)
+30cktCjVYk
+
+login: admin
+_________
+
+
+
+
+
+CRASH WARNINGS:
+https://ceph.io/releases/v14-2-5-nautilus-released/
+
+
+root@max1-master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh
+
+
+sh-4.2# ceph crash ls-new
+ID                                                               ENTITY NEW
+2020-02-16_01:46:12.024033Z_eca04e6b-4289-4215-9049-e9e3a3f8520d mon.a   *
+
+sh-4.2# ceph crash archive-all
+sh-4.2# ceph crash ls-new
+sh-4.2# ceph crash ls
+ID                                                               ENTITY NEW
+2020-02-16_01:46:12.024033Z_eca04e6b-4289-4215-9049-e9e3a3f8520d mon.a
+
+
+_________
+
+
+
+
+
+#### INSTALLING openldap ####
+
+
+openLDAP - single POD, helm chart (our own - adjusted Chart from the HELM repo)  - WORKING
+
+
+#remove old chart if needed:
+master# helm delete --purge openldap --tls
+
+
+master# cd /root/tmp-openldap/stable
+
+
+root@max2-master-01:~/tmp-openldap/stable# vi openldap/values.yaml
+(adjust storageNameClass and Sizes if needed)
+
+  884  vi openldap/templates/pvc.yaml
+(if needed)
+
+  885  mv openldap/templates/pv.yaml openldap/templates_pv_x2.yaml
+  886  kugetw pvc
+  887  kugetw pv
+
+
+
+# install chart:
+
+helm install  --name openldap  --namespace openldap openldap/ --tls
+
+#verify:
+
+master# kugetw po |grep ldap
+openldap       openldap-5cdc4f9b76-ppgqd                                0/1     Running     0          40s   10.244.5.77       max2-worker-01   <none>           <none>
+
+#troubleshooting :
+master# kubectl -n openldap describe po openldap-5cdc4f9b76-ppgqd
+
+root@max2-master-01:~/tmp-openldap/stable# kugetw pvc
+NAMESPACE   NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE    VOLUMEMODE
+openldap    ldap-conf   Bound    pvc-af310c39-0c28-462f-9eef-776a215a4d63   20Mi       RWO            rook-ceph-block   108s   Filesystem
+openldap    ldap-data   Bound    pvc-aae74204-0645-4472-b7ed-5aed284eb7d3   300Mi      RWO            rook-ceph-block   108s   Filesystem
+root@max2-master-01:~/tmp-openldap/stable# kugetw pv |grep ldap
+pvc-aae74204-0645-4472-b7ed-5aed284eb7d3   300Mi      RWO            Delete           Bound       openldap/ldap-data              rook-ceph-block            110s   Filesystem
+pvc-af310c39-0c28-462f-9eef-776a215a4d63   20Mi       RWO            Delete           Bound       openldap/ldap-conf              rook-ceph-block            110s   Filesystem
+
+
+
+# check pod's logs:
+
+root@max2-master-01:~/tmp-openldap/stable# kubectl -n openldap logs -f $(kubectl -n openldap get pod -l "app=openldap" -o jsonpath='{.items[0].metadata.name}')
+
+
+#### LOOKS GOOD!
+
+
+
+====  output from helm install: ====
+
+NAME:   openldap
+LAST DEPLOYED: Sat Nov 23 17:15:36 2019
+NAMESPACE: openldap
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/ConfigMap
+NAME          DATA  AGE
+openldap-env  6     0s
+
+==> v1/Deployment
+NAME      READY  UP-TO-DATE  AVAILABLE  AGE
+openldap  0/1    1           0          0s
+
+==> v1/PersistentVolumeClaim
+NAME       STATUS   VOLUME           CAPACITY  ACCESS MODES  STORAGECLASS  AGE
+ldap-conf  Pending  rook-ceph-block  0s
+ldap-data  Pending  rook-ceph-block  0s
+
+==> v1/Pod(related)
+NAME                       READY  STATUS   RESTARTS  AGE
+openldap-5cdc4f9b76-97kp6  0/1    Pending  0         0s
+
+==> v1/Secret
+NAME      TYPE    DATA  AGE
+openldap  Opaque  2     0s
+
+==> v1/Service
+NAME      TYPE       CLUSTER-IP    EXTERNAL-IP  PORT(S)          AGE
+openldap  ClusterIP  10.96.134.19  <none>       389/TCP,636/TCP  0s
+
+
+NOTES:
+OpenLDAP has been installed. You can access the server from within the k8s cluster using:
+
+  openldap.openldap.svc.cluster.local:389
+
+
+You can access the LDAP adminPassword and configPassword using:
+
+  kubectl get secret --namespace openldap openldap -o jsonpath="{.data.LDAP_ADMIN_PASSWORD}" | base64 --decode; echo
+  kubectl get secret --namespace openldap openldap -o jsonpath="{.data.LDAP_CONFIG_PASSWORD}" | base64 --decode; echo
+
+
+You can access the LDAP service, from within the cluster (or with kubectl port-forward) with a command like (replace password and domain):
+  ldapsearch -x -H ldap://openldap-service.openldap.svc.cluster.local:389 -b dc=example,dc=org -D "cn=admin,dc=example,dc=org" -w $LDAP_ADMIN_PASSWORD
+
+
+Test server health using Helm test:
+  helm test openldap
+
+
+
+
+==== END - output HELM install  ====
+
+========= END for openldap with 1 replica =======
+
+_________
+
+
+
+
+
+
+==== TEST DISK speed 
+
+master-01:~/tmp-openldap/stable# kubectl -n openldap exec -ti $(kubectl -n openldap get pod -l "app=openldap" -o jsonpath='{.items[0].metadata.name}')  bash
+
+
+root@openldap-5cdc4f9b76-97kp6:/# mount  |grep rbd
+/dev/rbd0 on /etc/ldap/slapd.d type ext4 (rw,relatime,stripe=4096,data=ordered)
+/dev/rbd1 on /var/lib/ldap type ext4 (rw,relatime,stripe=4096,data=ordered)
+
+
+
+root@openldap-5cdc4f9b76-97kp6:/# time dd if=/dev/zero of=/var/lib/ldap/test-file1 bs=100k count=1000
+65-760 MB/s
+
+root@openldap-5cdc4f9b76-97kp6:/# time dd if=/dev/zero of=/var/lib/ldap/test-file1 bs=1k count=100000
+65-256 MB/s
+
+
+
+
+
+
+_________
+
+
+#### TODO:
+
+- ceph-mon -   auf master-nodes laufen lassen (x3)? 
+
+- more ceph-mds pods = better 
+
+- 3x mgr pods - NOT SUPPORTED by ROOK yet.
+
+
+
+### READ: storageos -- ReadWriteOnce
+
+
+
+
+
+
+
+
+
+
+
+
+====== ReadWriteMany - CephFS   -   works (mid. 2019, not tested with latest Ceph v1.14.2/rook) =====
+
+WORKS !!!
+
+https://docs.syseleven.de/metakube/en/tutorials/read-write-many-volumes
+
+more ceph-mds pods = better
+
+
+
+# simple example:
+
+cat <<'EOF' | kubectl apply -f -
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook-ceph
+---
+apiVersion: ceph.rook.io/v1
+kind: CephFilesystem
+metadata:
+  name: rook-shared-fs
+  namespace: rook-ceph
+spec:
+  metadataPool:
+    replicated:
+      size: 3
+  dataPools:
+  - replicated:
+      size: 3
+  metadataServer:
+    activeCount: 1
+    activeStandby: true
+EOF
+
+
+
+
+
+# 2020.02.28  :  k8s 1.17.2
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# cp filesystem.yaml filesystem_max1.yaml
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# vi filesystem_max1.yaml  
+(change name and  metadataServer: activeCount: 2)
+
+
+BEFORE:
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].
+metadata.name}') sh
+sh-4.2# rados df
+POOL_NAME      USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS      RD  WR_OPS     WR USED COMPR UNDER COMPR
+replicapool 9.7 GiB     997      0   2991                  0       0        0  39752 262 MiB 3121154 45 GiB        0 B         0 B
+
+total_objects    997
+total_used       14 GiB
+total_avail      22 GiB
+total_space      36 GiB
+
+
+AFTER:
+sh-4.2# rados df
+POOL_NAME          USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS      RD  WR_OPS     WR USED COMPR UNDER COMPR
+cephfs-data0        0 B       0      0      0                  0       0        0      0     0 B       0    0 B        0 B         0 B
+cephfs-metadata 2.6 MiB      41      0    123                  0       0        0    266 137 KiB      85 24 KiB        0 B         0 B
+replicapool     9.7 GiB     997      0   2991                  0       0        0  39762 262 MiB 3122906 45 GiB        0 B         0 B
+
+total_objects    1038
+total_used       14 GiB
+total_avail      22 GiB
+total_space      36 GiB
+
+
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# kuget cephfilesystem
+NAMESPACE   NAME     ACTIVEMDS   AGE
+rook-ceph   cephfs   2           12m
+
+
+
+
+# create storageclass:
+
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# cp csi/cephfs/storageclass.yaml csi/cephfs/storageclass_max1.yaml
+# vi csi/cephfs/storageclass_max1.yaml (change name and pool accordingly, reclaimpolicy and debug)
+ 
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-cephfs
+provisioner: rook-ceph.cephfs.csi.ceph.com
+parameters:
+  # clusterID is the namespace where operator is deployed.
+  clusterID: rook-ceph
+
+  # CephFS filesystem name into which the volume shall be created
+  fsName: cephfs
+
+  # Ceph pool into which the volume shall be created
+  # Required for provisionVolume: "true"
+  pool: cephfs-data0
+
+  # Root path of an existing CephFS volume
+  # Required for provisionVolume: "false"
+  # rootPath: /absolute/path
+
+  # The secrets contain Ceph admin credentials. These are generated automatically by the operator
+  # in the same namespace as the cluster.
+  csi.storage.k8s.io/provisioner-secret-name: rook-csi-cephfs-provisioner
+  csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+  csi.storage.k8s.io/controller-expand-secret-name: rook-csi-cephfs-provisioner
+  csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+  csi.storage.k8s.io/node-stage-secret-name: rook-csi-cephfs-node
+  csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+
+  # (optional) The driver can use either ceph-fuse (fuse) or ceph kernel client (kernel)
+  # If omitted, default volume mounter will be used - this is determined by probing for ceph-fuse
+  # or by setting the default mounter explicitly via --volumemounter command-line argument.
+  # mounter: kernel
+#reclaimPolicy: Delete
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+mountOptions:
+  # uncomment the following line for debugging
+  - debug
+
+
+
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# kubectl apply -f csi/cephfs/storageclass_max1.yaml
+storageclass.storage.k8s.io/csi-cephfs created
+
+
+
+root@max1-master-01:~/tmp-08-ceph-rook/rook/cluster/examples/kubernetes/ceph# kuget storageclass
+NAME              PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+csi-cephfs        rook-ceph.cephfs.csi.ceph.com   Retain          Immediate           true                   17s
+rook-ceph-block   rook-ceph.rbd.csi.ceph.com      Retain          Immediate           true                   20d
+
+
+
+
+
+
+
+
+
+
+
+################ ?????
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl create -f /root/ldap-ceph-storageclass-FS.yaml
+
+test:
+
+root@max2-master-01:~# kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-operator" -o jsonpath='{.items[0].metadata.name}') sh
+sh-4.2# rados df
+POOL_NAME            USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS     RD WR_OPS    WR USED COMPR UNDER COMPR
+3repl-fs-data0        0 B       0      0      0                  0       0        0      0    0 B      0   0 B        0 B         0 B
+3repl-fs-metadata     0 B       0      0      0                  0       0        0      0    0 B      0   0 B        0 B         0 B
+
+
+
+
+sh-4.2# ceph auth get-key client.admin
+AQCOrzldTYiRCRAAxcLOGJ8uLh45dZBRj1EHGA==
+sh-4.2#
+
+
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# echo "AQCOrzldTYiRCRAAxcLOGJ8uLh45dZBRj1EHGA==" > /tmp/ceph.ad.sec
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl create namespace cephfs
+namespace/cephfs created
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl create secret generic ceph-secret-admin --from-file=/tmp/ceph.ad.sec --namespace ldap
+secret/ceph-secret-admin created
+
+...
+...
+################ ?????   END
+
+===============
+
+
+
+
+
+
+TEST POD (2 containers): 
+
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl create namespace ceph-rwx
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl apply --namespace=ceph-rwx -f /root/ceph-test-app-foFS.yaml
+
+cat /root/ceph-test-app-foFS.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: read-write-many
+    spec:
+      volumes:
+      - name: nginx-data
+        flexVolume:
+          driver: ceph.rook.io/rook
+          fsType: ceph
+          options:
+            fsName: myfs
+            clusterNamespace: rook-ceph
+      containers:
+      - image: nginx:latest
+        name: nginx
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: "/data"
+          name: nginx-data
+          readOnly: false
+
+
+DONE.
+
+WORKS.
+
+
+
+
+ 
+===============
+
+
+
+
+#### BLOCK-Storage TEST - MYSQL pod
+
+
+
+#create a test container: (vi storage: 1Gi  and storageClassName: rook-ceph-block )
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes# diff mysql.yaml /root/tmp0/rook-ceph-mysql-test.yaml
+
+
+# vi /root/tmp0/rook-ceph-mysql-test.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-mysql
+  labels:
+    app: wordpress
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: wordpress
+    tier: mysql
+  clusterIP: None
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+  labels:
+    app: wordpress
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress-mysql
+  labels:
+    app: wordpress
+    tier: mysql
+spec:
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: changeme
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
+
+
+
+root@max2-master-01:~/tmp3/rook/cluster/examples/kubernetes# kubectl create -f /root/tmp0/rook-ceph-mysql-test.yaml
+service/wordpress-mysql created
+persistentvolumeclaim/mysql-pv-claim created
+deployment.apps/wordpress-mysql created
+
+
+
+# Verify:
+
+master# kuget pvc |grep mysql
+default     mysql-pv-claim   Bound    pvc-ce474412-9580-47d5-987b-e3c3776619da   1Gi        RWO            rook-ceph-block   3m10s
+
+master# kuget pv |grep mysql
+pvc-ce474412-9580-47d5-987b-e3c3776619da   1Gi        RWO            Retain           Bound       default/mysql-pv-claim          rook-ceph-block            3m11s
+
+master# kuget po |grep mysql
+default        wordpress-mysql-b9ddd6d4c-sx9ww                          1/1     Running     0          3m16s
+
+master# kubectl logs -f wordpress-mysql-b9ddd6d4c-sx9ww
+
+
+
+WORKS!
+
+#### END test mysql. ####
+
+
+
+
+
+
+_______
+
+
+##  old TEST with little customizing (same mysql): 
+
+root@max2-master-01:~# kubectl create -f /root/ceph-volume-storage_only.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ldap-pv-claim
+  namespace: ldap
+  labels:
+    app: openldap
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 2Gi
+
+root@max2-master-01:~# kubectl create -f /root/ceph-volume-mysql-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ceph-mysql
+  namespace: ldap
+spec:
+  containers:
+    - name: ceph-mysql
+      image: tutum/mysql
+      ports:
+        - name: mysql-db
+          containerPort: 3306
+      volumeMounts:
+        - name: mysql-pv
+          mountPath: /var/lib/mysql
+  volumes:
+    - name: mysql-pv
+      persistentVolumeClaim:
+        claimName: ldap-pv-claim
+
+
+
+OK !
+
+
+
+===========
+
+
+TEST FS ???
+
+root@max2-master-01:~/tmp1/rook/cluster/examples/kubernetes/ceph# kubectl create -f filesystem.yaml
+cephfilesystem.ceph.rook.io/myfs created
+
+
+
+
+https://blog.kingj.net/2017/04/15/how-to/using-ceph-fs-persistent-volumes-with-kubernetes-containers/
+https://sysdig.com/blog/ceph-persistent-volume-for-kubernetes-or-openshift/
+
+master> kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') sh 
+
+
+ceph osd pool create test-ceph 256 256 
+
+
+========
+LATER, having:
+ #  ceph -s 
+    cluster 311a432d-40bd-46fe-97e2-32d70b1d2612
+     health HEALTH_WARN
+            too few PGs per OSD (25 < min 30)
+			
+it is necessary to increase number of PG/PGP for pool in question:
+
+ # ceph osd pool set rbdxxxx pg_num 4096
+ # ceph osd pool set rbdxxxx pgp_num 4096
+======== 
+ 
+sh-4.2# ceph osd pool ls
+test-ceph
+
+set 3 replicas for it:
+
+sh-4.2# ceph osd pool set test-ceph size 3
+
+sh-4.2# rbd create testdata --size 1G --pool test-ceph
+
+sh-4.2# rbd ls -l test-ceph
+NAME     SIZE  PARENT FMT PROT LOCK
+testdata 1 GiB          2
+
+
+STATS:
+
+sh-4.2# rados df
+POOL_NAME      USED OBJECTS CLONES COPIES MISSING_ON_PRIMARY UNFOUND DEGRADED RD_OPS     RD WR_OPS    WR USED COMPR UNDER COMPR
+replicapool     0 B       0      0      0                  0       0        0      0    0 B      0   0 B        0 B         0 B
+test-ceph   128 KiB       4      0      4                  0       0        0     93 74 KiB      5 5 KiB        0 B         0 B
+
+total_objects    4
+total_used       3.0 GiB
+total_avail      24 GiB
+total_space      27 GiB
+sh-4.2# ceph osd pool stats replicapool
+pool replicapool id 2
+  nothing is going on
+
+sh-4.2#
+sh-4.2# ceph osd pool stats test-ceph
+pool test-ceph id 1
+  nothing is going on
+
+========
+
+
+
+
+#create new key:
+sh-4.2# ceph auth get-or-create client.test mon 'allow r' mds 'allow rw path=/data/test' osd 'allow rw pool=test-ceph'
+[client.test]
+        key = AQBfyzldYWCrABAAEbvIfV3zrVq04Drne4pFaw==
+
+
+sh-4.2# ceph auth get-key client.test | base64
+QVFCZnl6bGRZV0NyQUJBQUVidklmVjN6clZxMDREcm5lNHBGYXc9PQ==
+
+
+
+
+root@max2-master-01:~/tmp7/charts/stable# vi /root/rook-ceph-ldap_create-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceph-test-secret
+  namespace: ldap
+data:
+  key: "QVFCZnl6bGRZV0NyQUJBQUVidklmVjN6clZxMDREcm5lNHBGYXc9PQ=="
+
+NAMESPACE MUST EXIST BEFORE NEXT STEP:
+
+root@max2-master-01:~/tmp7/charts/stable# kubectl create -f /root/rook-ceph-ldap_create-secret.yaml
+
+
+
+
+#EDIT it later , if required:
+root@max2-master-01:~# kubectl edit secrets ceph-test-secret -n ldap
+secret/ceph-ldap-secret edited
+
+
+
+
+
+
+
+
+
+========
+Next is to copy the keyring to each of the (worker?) nodes. ??
+
+vi /etc/ceph/ceph.client.client.test.keyring
+
+[client.test]
+   key = QVFCZnl6bGRZV0NyQUJBQUVidklmVjN6clZxMDREcm5lNHBGYXc9PQ==
+
+
+apps:~$ for i in $M2W ; do ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root $i   ; done
+
+echo "[client.test]
+   key = AQALkDBdzYdMBhAAQVfxo5JZkGvGBhVzulvFSw==" > /etc/ceph/ceph.client.client.ldap.keyring && cat /etc/ceph/ceph.client.client.ldap.keyring
+
+#otherwise container won't start:
+2019-07-20 09:29:47.753906 7fb9fc1360c0 -1 auth: unable to find a keyring on /etc/ceph/ceph.client.client.ldap.keyring,/etc/ceph/ceph.keyring,/etc/ceph/keyring,/etc/ceph/keyring.bin,: (2) No such file or directory
+2019-07-20 09:29:47.879005 7fb9fc1360c0  0 librados: client.client.ldap authentication error (1) Operation not permitted
+rbd: couldn't connect to the cluster!
+========
+
+
+
+Create PV and PVC:
+root@max2-master-01:~# cat /root/ceph-volume.yaml
+# Create local data volume and volume claim for ceph test
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ceph-test-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  rbd:
+    monitors:
+      - rook-ceph-mon-a.rook-ceph.svc.cluster.local:6789
+    pool: test-ceph
+    image: testdata
+    user: client.test
+    secretRef:
+      name: ceph-test-secret
+    fsType: ext4
+    readOnly: false
+  claimRef:
+    name: test-data-claim
+    namespace: ldap
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: test-data-claim
+  namespace: ldap
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+
+root@max2-master-01:~# kubectl create -f /root/ceph-volume.yaml
+
+# check with 
+ kuget pv
+ kuget pvc
+
+
+
+# install POD with this ceph mount
+
+
+root@max2-master-01:~/tmp7/charts/stable# kubectl create -f /root/ceph-volume-mysql-pod.yaml
+
+MountVolume.WaitForAttach failed for volume "ceph-pv" : fail to check rbd image status with: (fork/exec /usr/bin/rbd: invalid argument), rbd output: ()
+
+
+sh-4.2# ceph auth get-key client.ldap | base64
+QVFBTGtEQmR6WWRNQmhBQVFWZnhvNUpaa0d2R0JoVnp1bHZGU3c9PQ==
+
+
+root@max2-master-01:~# kubectl edit secrets ceph-ldap-secret -n ldap
+secret/ceph-ldap-secret edited
+
+
+
+.......
+.......
+
+
+
+
+
+
+
+
+# Example for the openldap installation:
+
+root@max2-master-01:~/tmp7/charts/stable# vi openldap/templates/deployment.yaml
+
+
+----- DIFFERENT THING, didn't work:
+
+add below to the "volumes:" section, BEFORE the last {{- end -}}:
+
+        - name: ceph-fs
+          cephfs:
+          monitors:
+          - 10.244.3.229:6789
+          - 10.244.6.22:6789
+          user: ldap
+          secretRef:
+          name: ceph-ldap-secret
+          path: "/data/ceph-ldap"
+
+
+
+root@max2-master-01:~/tmp7/charts# helm install --name ldap --namespace ldap stable/openldap --tls
+
+root@max2-master-01:~/tmp7/charts# kuget po |grep ldap
+ldap           ldap-openldap-779b999f4c-z5wlw                           0/1     Running     0          40s
+ldap           ldap-openldap-779b999f4c-zgpwn                           0/1     Running     0          40s
+ldap           phpldapadmin-54c6cdd757-6qqxx                            1/1     Running     0          7d1h
+
+root@max2-master-01:~/tmp7/charts# kubectl exec -ti -n ldap ldap-openldap-779b999f4c-z5wlw bash
+root@ldap-openldap-779b999f4c-z5wlw:/#
+
+
+
+
+========
+
+
+
+---- different thing - FS:
+sh-4.2# ceph fs volume create ldap-data 1024
+sh-4.2# ceph fs get ldap-data
+----
+
+
+========
+
+
+
+OSD manual removal 
+
+# This will use osd.5 as an example
+# ceph commands are expected to be run in the rook-toolbox
+1) disk fails
+2) remove disk from node
+3) mark out osd. `ceph osd out osd.5`
+4) remove from crush map. `ceph osd crush remove osd.5`
+5) delete caps. `ceph auth del osd.5`
+6) remove osd. `ceph osd rm osd.5`
+
+IF: osd.5 is still up; must be down before removal.
+THEN:
+# kubectl get -n rook-ceph all
+# kubectl delete -n rook-ceph deployment.apps/rook-ceph-osd-5
+
+7) delete the deployment `kubectl delete deployment -n rook-ceph rook-ceph-osd-id-5`
+8) delete osd data dir on node `rm -rf /var/lib/rook/osd5`
+9) edit the osd configmap `kubectl edit configmap -n rook-ceph rook-ceph-osd-nodename-config`
+9a) edit out the config section pertaining to your osd id and underlying device.
+10) add new disk and verify node sees it.
+11) restart the rook-operator pod by deleting the rook-operator pod
+12) osd prepare pods run
+13) new rook-ceph-osd-id-5 will be created
+14) check health of your cluster `ceph -s; ceph osd tree`
+
+========
+
+
+Remove HDD:
+
+root@max2-worker-04:~# dmsetup ls |grep ceph
+ceph--0f533194--24db--4faa--87f7--00eba91f0ae8-osd--data--bedeb3aa--7fd1--4f20--b003--146d006f5aa1      (253:0)
+root@max2-worker-04:~# dmsetup remove ceph--0f533194--24db--4faa--87f7--00eba91f0ae8-osd--data--bedeb3aa--7fd1--4f20--b003--146d006f5aa1
+root@max2-worker-04:~# sgdisk --zap-all /dev/sdb
+Creating new GPT entries.
+
+
+========================
+
+
+
+
+
+
+27.12.2019   rook ceph RWX (multi-writable)
+
+PREREQ: working CEPH cluster
+
+https://rook.io/docs/rook/v1.2/ceph-filesystem.html
+
+https://docs.syseleven.de/metakube/en/tutorials/read-write-many-volumes
+
+
+cat <<'EOF' | kubectl apply -f -
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook-ceph
+---
+apiVersion: ceph.rook.io/v1
+kind: CephFilesystem
+metadata:
+  name: rook-shared-fs
+  namespace: rook-ceph
+spec:
+  metadataPool:
+    replicated:
+      size: 3
+  dataPools:
+  - replicated:
+      size: 3
+  metadataServer:
+    activeCount: 1
+    activeStandby: true
+EOF
+
+
+
+#or use the file from examples:
+
+root@max2-master-01:~/tmp-rook-ceph/rook/cluster/examples/kubernetes/ceph# kubectl create -f filesystem.yaml
+cephfilesystem.ceph.rook.io/cephfs created
+
+
+#test:
+
+root@max2-master-01:~/tmp-rook-ceph/rook/cluster/examples/kubernetes/ceph# kubectl -n rook-ceph get pod -l app=rook-ceph-mds
+NAME                                      READY   STATUS    RESTARTS   AGE
+rook-ceph-mds-cephfs-a-b678bb879-5pxcc    1/1     Running   0          28s
+rook-ceph-mds-cephfs-b-6657c4bd4b-z2n8q   1/1     Running   0          27s
+root@max2-master-01:~/tmp-rook-ceph/rook/cluster/examples/kubernetes/ceph#
+
+
+#Create StorageClass, e.g. using the example file. Adjust reclaimPolicy and NAmes if needed.
+
+root@max2-master-01:~/tmp-rook-ceph/rook/cluster/examples/kubernetes/ceph# vi csi/cephfs/storageclass.yaml
+
+root@max2-master-01:~/tmp-rook-ceph/rook/cluster/examples/kubernetes/ceph# kubectl create -f csi/cephfs/storageclass.yaml
+storageclass.storage.k8s.io/csi-cephfs created
+root@max2-master-01:~/tmp-rook-ceph/rook/cluster/examples/kubernetes/ceph# kuget storageclass
+NAME              PROVISIONER                     AGE
+csi-cephfs        rook-ceph.cephfs.csi.ceph.com   6s
+rook-ceph-block   rook-ceph.rbd.csi.ceph.com      34d
+
+
+
+
+USE THE STORAGE:
+
+# cat nginx-rwx.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cephfs-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: csi-cephfs
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: read-write-many
+  template:
+    metadata:
+      labels:
+        app: read-write-many
+    spec:
+      volumes:
+      - name: nginx-data
+        persistentVolumeClaim:
+          claimName: cephfs-pvc
+          readOnly: false
+      containers:
+      - image: nginx:latest
+        name: nginx
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: "/data"
+          name: nginx-data
+          readOnly: false
+
+
+
+=====================
+
+
+
+csi-cephfs PROBLEMS after updating k8s v1.16.2 to v1.17.2
+
+
+
+
+root@max2-master-01:~# kubectl describe po -n odoo12b odoo12b-54f78fbf74-2txwm
+
+
+Events:
+  Type     Reason       Age                  From                     Message
+  ----     ------       ----                 ----                     -------
+  Normal   Scheduled    <unknown>            default-scheduler        Successfully assigned odoo12b/odoo12b-54f78fbf74-2txwm to max2-worker-03
+  Warning  FailedMount  21s                  kubelet, max2-worker-03  Unable to attach or mount volumes: unmounted volumes=[odoo-data], unattached volumes=[odoo-data default-token-227dk]: timed out waiting for the condition
+  Warning  FailedMount  16s (x9 over 2m24s)  kubelet, max2-worker-03  MountVolume.MountDevice failed for volume "pvc-cbd38cda-576d-4be5-82c4-b2d0c72245ec" : stat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-cbd38cda-576d-4be5-82c4-b2d0c72245ec/globalmount: transport endpoint is not connected
+
+
+
+
+OR also:
+
+root@nginx-deployment-576f5fcb96-cndxh:/# ls -la /data
+ls: cannot access '/data': Transport endpoint is not connected
+
+
+
+root@max2-master-01:~# kubectl get po -o yaml nginx-deployment-576f5fcb96-cndxh
+
+  volumes:
+  - name: nginx-data
+    persistentVolumeClaim:
+      claimName: cephfs-pvc
+  - name: default-token-p97z7
+    secret:
+      defaultMode: 420
+      secretName: default-token-p97z7
+
+
+
+
+
+root@max2-master-01:~# kubectl get pvc -o yaml cephfs-pvc
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: rook-ceph.cephfs.csi.ceph.com
+  creationTimestamp: "2019-12-27T19:51:51Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: cephfs-pvc
+  namespace: default
+  resourceVersion: "33052098"
+  selfLink: /api/v1/namespaces/default/persistentvolumeclaims/cephfs-pvc
+  uid: 74f83e06-82b7-490c-baf3-ef79844252a9
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: csi-cephfs
+  volumeMode: Filesystem
+  volumeName: pvc-74f83e06-82b7-490c-baf3-ef79844252a9
+status:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  phase: Bound
+
+
+root@max2-master-01:~# kubectl get pv -o yaml pvc-74f83e06-82b7-490c-baf3-ef79844252a9
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: rook-ceph.cephfs.csi.ceph.com
+  creationTimestamp: "2019-12-27T19:51:54Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-74f83e06-82b7-490c-baf3-ef79844252a9
+  resourceVersion: "33052094"
+  selfLink: /api/v1/persistentvolumes/pvc-74f83e06-82b7-490c-baf3-ef79844252a9
+  uid: 83617763-fbe0-49b1-8961-4bcba7a4da90
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: cephfs-pvc
+    namespace: default
+    resourceVersion: "33052054"
+    uid: 74f83e06-82b7-490c-baf3-ef79844252a9
+  csi:
+    driver: rook-ceph.cephfs.csi.ceph.com
+    fsType: ext4
+    nodeStageSecretRef:
+      name: rook-csi-cephfs-node
+      namespace: rook-ceph
+    volumeAttributes:
+      clusterID: rook-ceph
+      fsName: cephfs
+      pool: cephfs-data0
+      storage.kubernetes.io/csiProvisionerIdentity: 1576933208104-8081-rook-ceph.cephfs.csi.ceph.com
+    volumeHandle: 0001-0009-rook-ceph-0000000000000001-542099e5-28e2-11ea-80e1-82a62dc09967
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: csi-cephfs
+  volumeMode: Filesystem
+status:
+  phase: Bound
+
+
+
+
+root@max2-master-01:~# kubectl get sc csi-cephfs -o yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  creationTimestamp: "2019-12-27T19:42:43Z"
+  name: csi-cephfs
+  resourceVersion: "49325117"
+  selfLink: /apis/storage.k8s.io/v1/storageclasses/csi-cephfs
+  uid: 11c44f28-759a-4e7a-9e3c-280769e5ceca
+mountOptions:
+- debug
+parameters:
+  clusterID: rook-ceph
+  csi.storage.k8s.io/node-stage-secret-name: rook-csi-cephfs-node
+  csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+  csi.storage.k8s.io/provisioner-secret-name: rook-csi-cephfs-provisioner
+  csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+  fsName: cephfs
+  pool: cephfs-data0
+provisioner: rook-ceph.cephfs.csi.ceph.com
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+
+
+
+
+
+root@max2-master-01:~# kubectl describe sc csi-cephfs
+Name:                  csi-cephfs
+IsDefaultClass:        No
+Annotations:           <none>
+Provisioner:           rook-ceph.cephfs.csi.ceph.com
+Parameters:            clusterID=rook-ceph,csi.storage.k8s.io/node-stage-secret-name=rook-csi-cephfs-node,csi.storage.k8s.io/node-stage-secret-namespace=rook-ceph,csi.storage.k8s.io/provisioner-secret-name=rook-csi-cephfs-provisioner,csi.storage.k8s.io/provisioner-secret-namespace=rook-ceph,fsName=cephfs,pool=cephfs-data0
+AllowVolumeExpansion:  <unset>
+MountOptions:
+  debug
+ReclaimPolicy:      Retain
+VolumeBindingMode:  Immediate
+Events:             <none>
+
+
+
+
+
+root@max2-master-01:~#
+root@max2-master-01:~# kubectl describe po nginx-deployment-576f5fcb96-5vskz
+Name:           nginx-deployment-576f5fcb96-5vskz
+Namespace:      default
+Priority:       0
+Node:           max2-worker-02/116.203.206.179
+Start Time:     Wed, 05 Feb 2020 11:47:49 +0100
+Labels:         app=read-write-many
+                pod-template-hash=576f5fcb96
+Annotations:    <none>
+Status:         Pending
+IP:
+IPs:            <none>
+Controlled By:  ReplicaSet/nginx-deployment-576f5fcb96
+Containers:
+  nginx:
+    Container ID:
+    Image:          nginx:latest
+    Image ID:
+    Port:           80/TCP
+    Host Port:      0/TCP
+    State:          Waiting
+      Reason:       ContainerCreating
+    Ready:          False
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /data from nginx-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-p97z7 (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             False
+  ContainersReady   False
+  PodScheduled      True
+Volumes:
+  nginx-data:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  cephfs-pvc
+    ReadOnly:   false
+  default-token-p97z7:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-p97z7
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type     Reason       Age               From                     Message
+  ----     ------       ----              ----                     -------
+  Normal   Scheduled    <unknown>         default-scheduler        Successfully assigned default/nginx-deployment-576f5fcb96-5vskz to max2-worker-02
+  Warning  FailedMount  5s (x9 over 39s)  kubelet, max2-worker-02  MountVolume.MountDevice failed for volume "pvc-74f83e06-82b7-490c-baf3-ef79844252a9" : stat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-74f83e06-82b7-490c-baf3-ef79844252a9/globalmount: transport endpoint is not connected
+root@max2-master-01:~#
+
+
+
+
+CSI-plugin pod - logs
+root@max2-master-01:~# kubectl logs -f -n rook-ceph csi-cephfsplugin-7mb4s csi-cephfsplugin
+
+
+
+I0205 10:52:54.084888       1 utils.go:120] ID: 4530 GRPC request: {}
+I0205 10:52:54.086516       1 utils.go:125] ID: 4530 GRPC response: {}
+I0205 10:53:08.768454       1 utils.go:119] ID: 4531 GRPC call: /csi.v1.Node/NodeGetCapabilities
+I0205 10:53:08.768486       1 utils.go:120] ID: 4531 GRPC request: {}
+I0205 10:53:08.769945       1 utils.go:125] ID: 4531 GRPC response: {"capabilities":[{"Type":{"Rpc":{"type":1}}},{"Type":{"Rpc":{"type":2}}}]}
+I0205 10:53:08.774526       1 utils.go:119] ID: 4532 GRPC call: /csi.v1.Node/NodeGetVolumeStats
+I0205 10:53:08.774545       1 utils.go:120] ID: 4532 GRPC request: {"volume_id":"0001-0009-rook-ceph-0000000000000001-1952635e-3e9a-11ea-849b-aa2b703aece5","volume_path":"/var/lib/kubelet/pods/d1437e65-a6f3-4086-9fdd-b07c3b2a83d2/volumes/kubernetes.io~csi/pvc-cbd38cda-576d-4be5-82c4-b2d0c72245ec/mount"}
+I0205 10:53:08.777338       1 mount_linux.go:170] Cannot run systemd-run, assuming non-systemd OS
+I0205 10:53:08.777407       1 mount_linux.go:171] systemd-run failed with: exit status 1
+I0205 10:53:08.777441       1 mount_linux.go:172] systemd-run output: Failed to create bus connection: No such file or directory
+E0205 10:53:08.777736       1 utils.go:123] ID: 4532 GRPC error: rpc error: code = Internal desc = stat /var/lib/kubelet/pods/d1437e65-a6f3-4086-9fdd-b07c3b2a83d2/volumes/kubernetes.io~csi/pvc-cbd38cda-576d-4be5-82c4-b2d0c72245ec/mount: transport endpoint is not connected
+I0205 10:53:54.080471       1 utils.go:119] ID: 4533 GRPC call: /csi.v1.Identity/Probe
+I0205 10:53:54.080520       1 utils.go:120] ID: 4533 GRPC request: {}
+I0205 10:53:54.084529       1 utils.go:125] ID: 4533 GRPC response: {}
+I0205 10:54:19.517803       1 utils.go:119] ID: 4534 GRPC call: /csi.v1.Node/NodeGetCapabilities
+I0205 10:54:19.517835       1 utils.go:120] ID: 4534 GRPC request: {}
+I0205 10:54:19.518493       1 utils.go:125] ID: 4534 GRPC response: {"capabilities":[{"Type":{"Rpc":{"type":1}}},{"Type":{"Rpc":{"type":2}}}]}
+I0205 10:54:19.522606       1 utils.go:119] ID: 4535 GRPC call: /csi.v1.Node/NodeGetVolumeStats
+I0205 10:54:19.522644       1 utils.go:120] ID: 4535 GRPC request: {"volume_id":"0001-0009-rook-ceph-0000000000000001-1952635e-3e9a-11ea-849b-aa2b703aece5","volume_path":"/var/lib/kubelet/pods/783f9be2-c0f6-4a8d-a418-f55dea6aedf6/volumes/kubernetes.io~csi/pvc-cbd38cda-576d-4be5-82c4-b2d0c72245ec/mount"}
+I0205 10:54:19.527538       1 mount_linux.go:170] Cannot run systemd-run, assuming non-systemd OS
+I0205 10:54:19.527587       1 mount_linux.go:171] systemd-run failed with: exit status 1
+I0205 10:54:19.527611       1 mount_linux.go:172] systemd-run output: Failed to create bus connection: No such file or directory
+E0205 10:54:19.527690       1 utils.go:123] ID: 4535 GRPC error: rpc error: code = Internal desc = stat /var/lib/kubelet/pods/783f9be2-c0f6-4a8d-a418-f55dea6aedf6/volumes/kubernetes.io~csi/pvc-cbd38cda-576d-4be5-82c4-b2d0c72245ec/mount: transport endpoint is not connected
+
+
+
+
+GET the rook version:
+
+root@max2-master-01:~# kubectl -n rook-ceph get deployments -l rook_cluster=rook-ceph -o jsonpath='{range .items[*]}{.metadata.name}{"  \treq/upd/avl: "}{.spec.replicas}{"/"}{.status.updatedReplicas}{"/"}{.status.readyReplicas}{"  \trook-version="}{.metadata.labels.rook-version}{"\n"}{end}'
+
+
+
+...
+
+https://rook.io/docs/rook/v1.2/ceph-upgrade.html
+
+
+
+
+============================
+
+
+ISSUES:
+
+orphaned pod "113e4018-fab7-46aa-ac50-1c24c607d048" found, but volume paths are still present on disk
+
+in the logs of the worker node.
+
+solution:
+https://github.com/kubernetes/kubernetes/issues/60987
+
+LUN=113e4018-fab7-46aa-ac50-1c24c607d048
+mount |grep $LUN
+rm -rf /var/lib/kubelet/pods/$LUN/
+
+
+
+A=$(journalctl -n20 |grep "orphaned pod" |tail -1 |awk {'print $12'} | sed 's/^"\(.*\)"$/\1/') && mount |grep -i $A ;echo $A
+if no active mounts, remove it:
+rm -rf /var/lib/kubelet/pods/$A/
+
+
+
+
+
+========================
+
+List RBD images, snapshots, and clones in Ceph pools:
+
+
+for pool in `rados lspools`;
+    do echo "POOL :" $pool;
+       rbd ls -l $pool;
+       echo "-----";
+    done
+	
+	
+Remove image:
+rbd  -p replicapool rm  csi-vol-cc308170-2629-11ea-8bfa-da704
+
+
+[root@max2-worker-01 /]# rbd ls -l -p replicapool |grep 360
+
+[root@max2-worker-01 /]# rbd  -p replicapool info csi-vol-eadea542-2319-11ea-8bfa-da7042818eb6
+
+[root@max2-worker-01 /]# rbd  -p replicapool rm  csi-vol-eadea542-2319-11ea-8bfa-da7042818eb6
+
+
