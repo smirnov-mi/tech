@@ -19,6 +19,10 @@ https://github.com/hetznercloud/terraform-provider-hcloud
 See for details: https://github.com/smirnov-mi/tech/tree/main/hetzner/terraform
 
 
-
 **TF and ANS**  examples: https://prasanthmj.github.io/terraform/
 
+
+# Various
+
+Change DNS owner form: https://cdn.hetzner.com/assets/Uploads/downloads/Domaindatenaenderung.pdf
+As shown in https://konsoleh.hetzner.com/
