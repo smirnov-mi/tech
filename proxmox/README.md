@@ -78,3 +78,30 @@ https://youtu.be/08b9DDJ_yf4?si=94nwelC6EPaOZ17h
 
 https://www.youtube.com/watch?v=FQIdhX0xSoQ (DE)
 
+
+## Tweaks
+
+
+### Disable Subscription Warning
+
+	nano /etc/apt/sources.list.d/pve-enterprise.list
+	# comment out the line
+	# deb https://enterprise.proxmox.com/debian/pve buster pve-enterprise
+
+	apt update
+	apt dist-upgrade
+
+### Disable Subscription Warning (2)
+
+must repeat it after PVE updates
+
+	sed -Ezi.bak "s/(function\(orig_cmd\) \{)/\1\n\torig_cmd\(\);\n\treturn;/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
+
+might need to clear browser cache
+
+
+### see also
+
+https://www.youtube.com/watch?v=bo33EQk9CCM
+
+
