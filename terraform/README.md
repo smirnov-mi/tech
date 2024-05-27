@@ -39,8 +39,17 @@ provider configuration e.g. https://registry.terraform.io/providers/hetznercloud
 29. terraform plan -out: Saves the generated plan to a file.
 30. terraform apply -auto-approve: Automatically applies changes without requiring approval.
 31. terraform apply -target=resource: Applies changes only to a specific resource.
-32. terraform destroy -target=resource: Destroys a specific resource.
-33. terraform apply -var="key=value": Sets a variable's value directly in the command line.
-34. terraform apply -var-file=filename.tfvars: Specifies a file containing variable definitions.
-35. terraform apply -var-file=filename.auto.tfvars: Automatically loads variables from a file.
+
+
+## Graph visualization
+
+    tf graph
+
+https://dreampuf.github.io/GraphvizOnline/
+
+
+33. terraform destroy -target=resource: Destroys a specific resource.
+34. terraform apply -var="key=value": Sets a variable's value directly in the command line.
+35. terraform apply -var-file=filename.tfvars: Specifies a file containing variable definitions.
+36. terraform apply -var-file=filename.auto.tfvars: Automatically loads variables from a file.
 
