@@ -1,6 +1,6 @@
-# as a Service
+# * as a Service
 
-what can be delivered as a service, different stages for different goals.
+Basic overview of what can be delivered as a service, different stages for different goals.
 
 
 ## SAAS PAAS IAAS - RedHat
