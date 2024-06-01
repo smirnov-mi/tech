@@ -12,16 +12,89 @@ Free and opensource Ansible Tower (AAP2) powered by RedHat
 
 ## install AWX 
 
-as a helm chart
+1.June 2024 - Install AWX 24.4.0 as a helm chart on k3s v1.29.5+k3s1
+
 
 https://ansible.readthedocs.io/projects/awx-operator/en/latest/installation/helm-install-on-existing-cluster.html
 
 https://github.com/ansible/awx-operator/blob/devel/.helm/starter/README.md
 
+install operator
 
-my-values.yaml must be created for the service to work.
+```bash
+helm repo add awx-operator https://ansible.github.io/awx-operator/
+helm repo update
+helm search repo awx-operator
+helm install -n awx --create-namespace my-awx-operator awx-operator/awx-operator -f my-values.yaml
+```
 
-***WORK IN PROGRESS***
+install AWX itself
+
+```bash
+
+helm install -n awx --create-namespace my-awx-operator awx-operator/awx-operator
+
+NAME: my-awx-operator
+LAST DEPLOYED: Sat Jun  1 23:33:57 2024
+NAMESPACE: awx
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+AWX Operator installed with Helm Chart version 2.17.0
+
+
+
+echo -e "
+apiVersion: awx.ansible.com/v1beta1
+kind: AWX
+metadata:
+  name: ansible-awx
+  namespace: awx
+spec:
+  service_type: nodeport
+" > ansible-awx.yaml
+
+
+kubectl apply -f ansible-awx.yaml
+
+
+
+k get svc -n awx
+NAME                                              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+awx-operator-controller-manager-metrics-service   ClusterIP   10.43.239.106   <none>        8443/TCP       14m
+ansible-awx-postgres-15                           ClusterIP   None            <none>        5432/TCP       114s
+ansible-awx-service                               NodePort    10.43.150.101   <none>        80:31152/TCP   66s
+
+```
+
+**WAIT a few minutes** 
+
+
+
+```
+
+kubectl get secret ansible-awx-admin-password -o jsonpath="{.data.password}" -n awx | base64 --decode ; echo
+qeq9rU0TiOxYUMfk0IFcEyQB7rLKVp0d
+```
+
+access http://localhost:NodePort
+
+
+## see also
+
+https://ansible.readthedocs.io/projects/awx-operator/en/latest/installation/helm-install-on-existing-cluster.html
+
+https://github.com/ansible/awx/blob/devel/INSTALL.md#installing-the-awx-cli
+
+
+
+## Ingress and custom values
+
+https://github.com/ansible/awx-operator/blob/devel/.helm/starter/README.md
+
+
+***TLDR;***
 
 
 ```yaml
@@ -97,14 +170,6 @@ awx:
 	  - name: SECRET_KEY
 ```
 
-
-```yaml
-```bash
-helm repo add awx-operator https://ansible.github.io/awx-operator/
-helm repo update
-helm search repo awx-operator
-helm install -n awx --create-namespace my-awx-operator awx-operator/awx-operator -f my-values.yaml
-```
 
 
 
