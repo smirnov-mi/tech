@@ -25,7 +25,7 @@ install operator
 helm repo add awx-operator https://ansible.github.io/awx-operator/
 helm repo update
 helm search repo awx-operator
-helm install -n awx --create-namespace my-awx-operator awx-operator/awx-operator -f my-values.yaml
+helm install -n awx --create-namespace my-awx-operator awx-operator/awx-operator [-f my-values.yaml]
 ```
 
 install AWX itself
