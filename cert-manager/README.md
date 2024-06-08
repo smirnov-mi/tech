@@ -9,6 +9,10 @@ install cert-manager **WITH CRDs**
 
     --set crds.enabled=true
 
+or
+
+        crds:
+          enabled: true
 
 Check:
 
