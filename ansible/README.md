@@ -2,7 +2,7 @@
 
 ## CLI ansible installation
 
-see [ansible-cli.md](ansible-cli.md)
+see [ansible-setup-cli.md](ansible-setup-cli.md)
 
 ## AWX setup
 
