@@ -28,7 +28,8 @@ helm search repo awx-operator
 helm install -n awx --create-namespace my-awx-operator awx-operator/awx-operator [-f my-values.yaml]
 ```
 
-install AWX itself
+
+after
 
 ```bash
 
@@ -42,8 +43,28 @@ REVISION: 1
 TEST SUITE: None
 NOTES:
 AWX Operator installed with Helm Chart version 2.17.0
+```
 
+install AWX itself
 
+*awx-pvc.yaml  might be required*
+
+```bash
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-13-ansible-awx-postgres-13-0
+  namespace: awx
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+```
+
+```bash
 
 echo -e "
 apiVersion: awx.ansible.com/v1beta1
