@@ -9,7 +9,7 @@ Free and opensource Ansible Tower (AAP2) powered by RedHat
 
 We are installing AWX as a Helm chart on a simple k3s cluster, so first see:
 
-[../k3s/README.md](../k3s/README.md)
+[k3s-setup](https://github.com/smirnov-mi/k8s/tree/main/k3s)
 
 
 ## install AWX 
