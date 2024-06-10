@@ -91,3 +91,6 @@ xxx@rancher-mc:~/ansible-git$ sudo pip install ./hcloud-python
 
 https://github.com/smirnov-mi/ansible/edit/main/setup.md
 
+# for AWX setup see
+
+[ansible-setup-awx.md](ansible-setup-awx.md)
