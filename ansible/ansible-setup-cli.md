@@ -87,6 +87,29 @@ xxx@rancher-mc:~/ansible-git$ sudo pip install ./hcloud-python
 ```
 
 
+
+### updating a collection (on a server and user)
+
+p.s. still looking for a way to add a collection requirement into a playbook.
+
+
+    muscat@rancher-mc:~/git/ansible$ cat req.yaml
+    collections:
+      - name: hetzner.hcloud
+    
+    muscat@rancher-mc:~/git/ansible$ ansible-galaxy install -r req.yaml --force
+    Starting galaxy collection install process
+    Process install dependency map
+    Starting collection install process
+    Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/hetzner-hcloud-3.1.1.tar.gz to /root/.ansible/tmp/ansible-local-216638wmp9qlzl/tmpa59pterm/hetzner-hcloud-3.1.1-p983ygtj
+    Installing 'hetzner.hcloud:3.1.1' to '/root/.ansible/collections/ansible_collections/hetzner/hcloud'
+    hetzner.hcloud:3.1.1 was installed successfully
+    
+    muscat@rancher-mc:~/git/ansible$ ansible-galaxy collection list |grep hcloud
+    hetzner.hcloud                           3.1.1
+    hetzner.hcloud                           2.5.0
+
+
 # see also
 
 https://github.com/smirnov-mi/ansible/edit/main/setup.md
