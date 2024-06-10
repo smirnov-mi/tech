@@ -26,5 +26,6 @@ https://github.com/helm/helm/releases
 
 see: https://helm.sh/docs/chart_template_guide/getting_started/
 
-easy howto: https://www.youtube.com/watch?v=jUYNS90nq8U
+easiest howto: https://www.youtube.com/watch?v=jUYNS90nq8U
 
+also a solid course: https://m.youtube.com/watch?v=EbgwXCTVN1o&list=PLSwo-wAGP1b8svO5fbAr7ko2Buz6GuH1g&index=12
