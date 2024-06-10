@@ -45,7 +45,7 @@ https://helm.sh/docs/intro/install/
 
 	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-verify helm installation, as YOUR user (mpt root)
+verify helm installation, as YOUR user (not root)
 
 	
 	helm list
