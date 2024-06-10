@@ -47,7 +47,6 @@ NOTES:
 AWX Operator installed with Helm Chart version 2.17.0
 ```
 
-install AWX itself
 
 *awx-pvc.yaml  might be required*
 
@@ -65,6 +64,9 @@ spec:
     requests:
       storage: 2Gi
 ```
+
+
+install AWX itself
 
 ```bash
 
@@ -125,6 +127,16 @@ helm uninstall my-awx-operator -n awx
 ```
 
 
+##  Add hetzner collection
+
+you must define the required collection(s) in the right place, so that the AWX job can find it.
+
+**collections/requirements.yml** must be placed in the root of the project
+
+	collections:
+ 	  - name: hetzner.hcloud
+   
+
 # Ansible CLI installation
 
 see [ansible-setup-cli.md](ansible-setup-cli.md)
@@ -132,7 +144,8 @@ see [ansible-setup-cli.md](ansible-setup-cli.md)
 
 
 
-***TLDR;***
+
+# TLDR;
 
 
 ```yaml
