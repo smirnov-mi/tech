@@ -41,6 +41,8 @@ sudo apt-get update
 
 ## FIND THE LATEST CNI: https://github.com/containernetworking/plugins/releases
 
+    curl -s https://api.github.com/repos/containernetworking/plugins/releases/latest | jq -r '.tag_name'
+    
     wget https://github.com/containernetworking/plugins/releases/download/v1.5.0/cni-plugins-linux-amd64-v1.5.0.tgz
     mkdir -p /opt/cni/bin
     tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.5.0.tgz
@@ -49,6 +51,7 @@ sudo apt-get update
 
 ## FIND THE LATEST NerdCTL: https://github.com/containerd/nerdctl/releases
 
+    curl -s https://api.github.com/repos/containerd/nerdctl/releases/latest | jq -r '.tag_name'
     wget https://github.com/containerd/nerdctl/releases/download/v1.7.6/nerdctl-1.7.6-linux-amd64.tar.gz
     sudo tar Cxzvf /usr/local/bin nerdctl-1.7.6-linux-amd64.tar.gz
 
