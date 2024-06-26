@@ -61,3 +61,24 @@ sudo apt-get update
 
     sudo nerdctl run -d --name nginx -p 80:80 nginx:alpine
 
+## for rootless
+
+rootlesskit is required for use nerdctl as non-root
+
+    root@Ubuntu24-ws:~# apt install rootlesskit
+
+then run as your account:
+
+    muscat$ containerd-rootless-setuptool.sh install
+
+output:
+
+    ...
+    + systemctl --user enable containerd.service
+    [INFO] Installed "containerd.service" successfully.
+    [INFO] To control "containerd.service", run: `systemctl --user (start|stop|restart) containerd.service`
+    [INFO] To run "containerd.service" on system startup automatically, run: `sudo loginctl enable-linger muscat`
+
+Now you can use nerdctl as your account ("muscat" in this case)
+
+
