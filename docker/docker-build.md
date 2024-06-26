@@ -12,6 +12,7 @@ https://github.com/containerd/nerdctl/blob/main/docs/build.md
 
 ### Buildkitd :
 
+```bash
 https://github.com/moby/buildkit/tree/v0.14.1?tab=readme-ov-file#linux-setup
 
 https://github.com/moby/buildkit/releases  (0.14.1)
@@ -21,29 +22,31 @@ root@Ubuntu24-ws:~# wget https://github.com/moby/buildkit/releases/download/v0.1
 tar -xvfz ....
 
 root@Ubuntu24-ws:~/buildkit# mv bin/build* /usr/local/bin/
-
+```
 
 
 ### start buildkitd inthe first terminal:
-
-muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo /usr/local/bin/buildkitd --oci-worker=false --containerd-worker=true
+```bash
+muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo /usr/local/bin/buildkitd --oci-worker=false --containerd-worker=true &
+```
 
 ### run in second terminal:
 
+```bash
 muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo nerdctl build . -t em-tg-bot:1.0.0 -t em-tg-bot:latest
 
 muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo nerdctl image ls
 REPOSITORY    TAG       IMAGE ID        CREATED           PLATFORM       SIZE         BLOB SIZE
 em-tg-bot     1.0.0     a7956f357051    54 seconds ago    linux/amd64    152.1 MiB    48.8 MiB
 em-tg-bot     latest    a7956f357051    52 seconds ago    linux/amd64    152.1 MiB    48.8 MiB
-
+```
 
 ### to upload the docker image (e.g. to hub.docker.com) account is required
-
+```bash
 muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo nerdctl login
 muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo nerdctl tag em-tg-bot:1.0.0 smichi/em-tg:bot1.0.0
 muscat@Ubuntu24-ws:~/rancher-mc-old/DCKR/py1$ sudo nerdctl push smichi/em-tg:bot1.0.0
-
+```
 
 verify it's been uploaded: https://hub.docker.com/ (login required)
 
