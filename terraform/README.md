@@ -48,6 +48,29 @@ provider configuration e.g. https://registry.terraform.io/providers/hetznercloud
 https://dreampuf.github.io/GraphvizOnline/
 
 
+## var.object default
+
+Tt is working this way:
+
+        variable "machine_details" {
+          type = object({
+            name = string
+            size = string
+            username = string
+            password = string
+          })
+        
+          default = {
+              name = "example-vm"
+              size = "Standard_F2"
+              username  = "adminuser"
+              password = "Notallowed1!"
+            }
+          
+        }
+
+And can refer like this : var.machine_details.name
+
 33. terraform destroy -target=resource: Destroys a specific resource.
 34. terraform apply -var="key=value": Sets a variable's value directly in the command line.
 35. terraform apply -var-file=filename.tfvars: Specifies a file containing variable definitions.
