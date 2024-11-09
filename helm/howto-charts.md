@@ -25,5 +25,12 @@ connect to you repo:
 helm repo add https://smirnov-mi.github.io/charts-gitea/
 ```
 
+verify that you see your package:
+```bash
+helm search repo gitea
+NAME                    CHART VERSION   APP VERSION     DESCRIPTION
+charts-gitea/gitea      10.5.0          1.22.3          Gitea Helm chart for Kubernetes
+```
+
 
 
