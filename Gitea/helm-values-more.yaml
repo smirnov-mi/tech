@@ -1,0 +1,28 @@
+# HELM values for Gitea HELM chart by Bitnami
+
+# based on https://gitea.com/gitea/helm-chart
+
+## more than minimal DEV installation
+
+redis-cluster:
+  enabled: false
+redis:
+  enabled: false
+postgresql:
+  enabled: false
+postgresql-ha:
+  enabled: false
+
+persistence:
+  enabled: false
+
+gitea:
+  config:
+    database:
+      DB_TYPE: sqlite3
+    session:
+      PROVIDER: memory
+    cache:
+      ADAPTER: memory
+    queue:
+      TYPE: level
