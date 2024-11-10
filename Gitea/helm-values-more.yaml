@@ -4,6 +4,11 @@
 
 ## more than minimal DEV installation
 
+## namespace added in HELM command, e.g.:
+# helm install gitea1 charts-gitea/gitea -f gitea-values-minimal.yaml --namespace test1 --create-namespace
+
+## DNS-name
+
 redis-cluster:
   enabled: false
 redis:
