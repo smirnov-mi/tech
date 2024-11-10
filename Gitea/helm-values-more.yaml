@@ -18,6 +18,16 @@ postgresql:
 postgresql-ha:
   enabled: false
 
+service:
+  http:
+    type: ClusterIP
+    port: 3000
+    clusterIP:
+  ssh:
+    type: ClusterIP
+    port: 22
+    clusterIP:
+
 persistence:
   enabled: false
 
